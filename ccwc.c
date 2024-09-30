@@ -6,6 +6,16 @@
 #include <errno.h>
 #include <ctype.h>
 #include <locale.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <locale.h>
+#include <wchar.h>
+#include <string.h>
+
+#define BOM_UTF8 "\xEF\xBB\xBF"      // UTF-8 BOM
+#define BOM_UTF16_BE "\xFE\xFF"      // UTF-16 Big Endian BOM
+#define BOM_UTF16_LE "\xFF\xFE"      // UTF-16 Little Endian BOM
+
 
 // booleanOriented function names
 bool isOperatorC(const char* arg){
@@ -131,34 +141,79 @@ long getFileWordCount(char* filename){
   return count;
 }
 
-long getCharacterCount(char* filename){
+// Function to detect and skip BOM if present
+void skipBOM(FILE *fp) {
+    char bom[4] = {0};
 
-  FILE *fp = openFile(filename);
+    // Read first 3 bytes from the file to check for BOM
+    fread(bom, 1, 3, fp);
 
-  setlocale(LC_ALL, NULL);
-
-  long count = 0;
-  int n;
-  char buffer[MB_CUR_MAX];
-
-  while (fread(buffer, 1, 1, fp) == 1){
-    n = mblen(buffer, MB_CUR_MAX);
-
-    if (n > 0){
-      fread(buffer + 1, 1, n - 1, fp);
-      count++;
-    } else if (n == 0){
-      count++;
-    } else {
-      perror("Invalid Multibyte character.");
-      fclose(fp);
-      return -1;
+    // Check for UTF-8 BOM
+    if (memcmp(bom, BOM_UTF8, 3) == 0) {
+        // BOM found, return without rewinding
+        return;
     }
-  }
-  fclose(fp);
-  return count;
+
+    // If not UTF-8 BOM, check for UTF-16 BOMs (first 2 bytes)
+    if (memcmp(bom, BOM_UTF16_BE, 2) == 0 || memcmp(bom, BOM_UTF16_LE, 2) == 0) {
+        // Handle UTF-16 BOM case (you could implement specific UTF-16 handling if needed)
+        fprintf(stderr, "Warning: UTF-16 BOM detected, but not handled in this implementation.\n");
+        return;
+    }
+
+    // If no BOM found, rewind to the beginning
+    fseek(fp, 0, SEEK_SET);
 }
 
+// Function to count characters in a file, including multibyte characters
+long getFileCharacterCount(const char* filename) {
+    // Set the locale for multibyte character handling (e.g., UTF-8)
+    if (setlocale(LC_ALL, "") == NULL) {
+        perror("Error setting locale");
+        return -1;
+    }
+
+    FILE *fp = fopen(filename, "r");
+    if (fp == NULL) {
+        perror("Error opening file");
+        return -1;
+    }
+
+    long charCount = 0;
+    int ch;
+
+    // Read the file byte by byte
+    while ((ch = fgetc(fp)) != EOF) {
+        unsigned char byte = (unsigned char)ch;
+
+        // Detect the length of the current UTF-8 character based on the first byte
+        if ((byte & 0x80) == 0) {
+            // ASCII character (1 byte)
+            charCount++;
+        } else if ((byte & 0xE0) == 0xC0) {
+            // 2-byte character
+            fgetc(fp);  // Skip the next byte
+            charCount++;
+        } else if ((byte & 0xF0) == 0xE0) {
+            // 3-byte character
+            fgetc(fp);  // Skip the next 2 bytes
+            fgetc(fp);
+            charCount++;
+        } else if ((byte & 0xF8) == 0xF0) {
+            // 4-byte character
+            fgetc(fp);  // Skip the next 3 bytes
+            fgetc(fp);
+            fgetc(fp);
+            charCount++;
+        } else {
+            // If it's an invalid byte, still count it as 1 character
+            charCount++;
+        }
+    }
+
+    fclose(fp);
+    return charCount;
+}
 
 int main(int argc, char* argv[])
 {
@@ -193,7 +248,7 @@ int main(int argc, char* argv[])
 
   else if (isOperatorM(argv[1]))
   {
-      long characterCount = getCharacterCount(argv[2]);
+      long characterCount = getFileCharacterCount(argv[2]);
       printf("%ld %s\n", characterCount, argv[2]);
   }
 
