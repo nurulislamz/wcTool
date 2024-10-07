@@ -141,7 +141,6 @@ long getFileWordCount(char* filename){
   return count;
 }
 
-// Function to detect and skip BOM if present
 void skipBOM(FILE *fp) {
     char bom[4] = {0};
 
@@ -165,7 +164,6 @@ void skipBOM(FILE *fp) {
     fseek(fp, 0, SEEK_SET);
 }
 
-// Function to count characters in a file, including multibyte characters
 long getFileCharacterCount(const char* filename) {
     // Set the locale for multibyte character handling (e.g., UTF-8)
     if (setlocale(LC_ALL, "") == NULL) {
@@ -218,39 +216,58 @@ long getFileCharacterCount(const char* filename) {
 int main(int argc, char* argv[])
 {
 
-  if (argc != 3)
+  if (!argc == 2 || !argc == 3)
   {
-    printf("Error: Expected 2 arguments, but got %d\n", argc - 1);
+    printf("Error: Expected 2/3 arguments, but got %d\n", argc);
     return -1;
   }
 
-  if (!doesFileExists(argv[2])){
-    return -1;
+  if (argc == 2){
+    if (!doesFileExists(argv[1])){
+      return -1;
+    }
+    char* fileName = argv[1];
+    long fileSize = getFileSize(fileName);
+    long fileLines = getFileLineCount(fileName);
+    long fileWords = getFileWordCount(fileName);
+    printf("%ld %ld %ld %s", fileSize, fileLines, fileWords, fileName);
+    return 0;
   }
 
-  if (isOperatorC(argv[1]))
-  {
-    long fileSize = getFileSize(argv[2]);
-    printf("%ld %s\n", fileSize, argv[2]);
-  }
 
-  else if (isOperatorL(argv[1]))
-  {
-      long fileLines = getFileLineCount(argv[2]);
-      printf("%ld %s\n", fileLines, argv[2]);
-  }
+  if (argc == 3){
+    if (!doesFileExists(argv[2]))
+    {
+      return -1;
+    }
 
-  else if (isOperatorW(argv[1]))
-  {
-      long fileWords = getFileWordCount(argv[2]);
-      printf("%ld %s\n", fileWords, argv[2]);
-  }
+    if (isOperatorC(argv[1]))
+    {
+      long fileSize = getFileSize(argv[2]);
+      printf("%ld %s", fileSize, argv[2]);
+      return 0;
+    }
 
-  else if (isOperatorM(argv[1]))
-  {
-      long characterCount = getFileCharacterCount(argv[2]);
-      printf("%ld %s\n", characterCount, argv[2]);
-  }
+    else if (isOperatorL(argv[1]))
+    {
+        long fileLines = getFileLineCount(argv[2]);
+        printf("%ld %s", fileLines, argv[2]);
+        return 0;
+    }
 
-  return 0;
+    else if (isOperatorW(argv[1]))
+    {
+        long fileWords = getFileWordCount(argv[2]);
+        printf("%ld %s", fileWords, argv[2]);
+        return 0;
+    }
+
+    else if (isOperatorM(argv[1]))
+    {
+        long characterCount = getFileCharacterCount(argv[2]);
+        printf("%ld %s", characterCount, argv[2]);
+        return 0;
+    }
+  }
+  return -1;
 }
